@@ -1,6 +1,7 @@
-#include <iostream>
+// Copyright [2021] <Matheus Dhanyel Cândido Roque>
+
+#include "structures.cpp"
 
 int main() {
-    std::cout << "Hello World!\n";
     return 0;
 }

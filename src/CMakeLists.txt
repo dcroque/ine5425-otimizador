@@ -7,4 +7,6 @@ target_sources(
     otimizador
     PRIVATE
         main.cpp
+        structures.hpp
+        structures.cpp
 )
