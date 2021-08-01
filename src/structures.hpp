@@ -5,49 +5,109 @@
 #include<stdlib.h>
 #include<string>
 #include<vector>
-#include<functional>
+
+#include "binary_tree.hpp"
 
 namespace structures {
-    class Operation {
+    class OptimizationConfig {
         private:
-            double* opr_a;
-            double* opr_b;
-            std::function<double(double, double)> op;
+            std::vector<std::string> controls;
+            std::vector<std::string> responses;
+            std::vector<Constraint> constraints;
+            std::vector<Objective> objectives;
+            std::string model_path;
+            std::string output_path;
+            std::string simulator_path;
+
+            int generation_size = 20;
+            int precision = 5;
+            int max_persist = 10;
+            int persist = 0;
+            int gen = 0;
+            int min_gen = 10;
+        public:
+            OptimizationConfig(std::string config_file);
     };
 
-    class Control {
+    class OptimizationUnit {
         private:
-            std::string name;
-            double value;
+            VarVector controls;
+            VarVector responses;
+            double fit;
+        public:
+            OptimizationUnit(OptimizationUnit& parent1, OptimizationUnit& parent2);
+            OptimizationUnit(VarVector& _controls);
+            ~OptimizationUnit();
+    };
+
+    class OptimizationCore {
+        private:
+            std::vector<OptimizationUnit> units;
+            OptimizationConfig configs;
+            std::vector<Solution> solutions;
+        public:
+            OptimizationCore();
+            ~OptimizationCore();
     };
 
     class Constraint {
         private:
             std::string name;
-            std::vector<Operation> left_side;
-            std::vector<Operation> right_side;
-            std::vector<double> temporary_values;
-            Operation comparation;
-    };
-
-    class Response {
-        private:
-            std::string name;
-            double value;
+            ExpressionTree expression;
+        public:
+            Constraint(std::string _name, std::string expression);
+            ~Constraint();
     };
 
     class Objective {
         private:
             bool max;
-            std::string variable;
-            bool require;
+            ExpressionTree expression;
+        public:
+            Objective(bool _max, std::string expression);
+            ~Objective();
     };
 
     class Solution {
         private:
-            std::vector<Response> responses;
-            bool all_require;
-            bool all_objectives;
+            OptimizationUnit unit;
+        public:
+            Solution(OptimizationUnit _unit);
+            ~Solution();
+    };
+
+    class ExpressionTree {
+        private:
+            std::string expression;
+            BinaryTree<std::string> calc_tree;
+        public:
+            ExpressionTree(std::string expression);
+            ~ExpressionTree();
+
+    };
+
+    class Variable {
+        private:
+            std::string name;
+            double value;
+        public:
+            Variable(std::string _name, double _value);
+            ~Variable();
+
+            std::string get_name();
+            double get_value();
+
+            void set_value(double& _value);
+    };
+
+    class VarVector {
+        public:
+            std::vector<Variable> vector;
+
+            VarVector();
+            ~VarVector();
+
+            double var_value(std::string name);
     };
 }
 
