@@ -240,7 +240,7 @@ std::size_t structures::BinaryTree<T>::size() const {
 
 template<typename T>
 std::vector<T> structures::BinaryTree<T>::pre_order() const {
-    ArrayList<T> temp{size_};
+    std::vector<T> temp{size_};
     if (!empty()) {
         root->pre_order(temp);
     }
@@ -249,7 +249,7 @@ std::vector<T> structures::BinaryTree<T>::pre_order() const {
 
 template<typename T>
 std::vector<T> structures::BinaryTree<T>::in_order() const {
-    ArrayList<T> temp{size_};
+    std::vector<T> temp{size_};
     if (!empty()) {
         root->in_order(temp);
     }
@@ -258,7 +258,7 @@ std::vector<T> structures::BinaryTree<T>::in_order() const {
 
 template<typename T>
 std::vector<T> structures::BinaryTree<T>::post_order() const {
-    ArrayList<T> temp{size_};
+    std::vector<T> temp{size_};
     if (!empty()) {
         root->post_order(temp);
     }

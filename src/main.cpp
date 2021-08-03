@@ -5,75 +5,88 @@
 #include "structures.hpp"
 
 int main(int argc, char** argv) {
-    // 1. Read command
+// 1. Read command
 
-        // 1.1. Parse command line
+    // 1.1. Parse command line
 
-        // 1.2. Check input files existance
-    
-    // 2. Setup stuff
+    auto cli = structures::CLI(argc, argv);
+    auto logger = logger::Logger("MAIN", cli.verbosity());
 
-        // 2.1. Parse input files
+    // 1.2. Check input file existance
 
-        // 2.2. Initialize OptimizationCore
+    if (!cli.loaded()) {
+        logger.error("Exiting application with an error");
+        return 1;
+    } else {
+        logger.info("Configuration file succesfully loaded", 2);
+    }
 
-        // 2.3. Run model simulation to check integrity
+// 2. Setup stuff
 
-        // 2.4. Check simulation output file existance
+    // 2.1. Parse input files
 
-    // 3. Run simulation
+    // 2.2. Initialize OptimizationCore
 
-        // 3.1. Create model input variations
+    // 2.3. Run model simulation to check integrity
 
-        // 3.2. Split simulator calls in threads
+    // 2.4. Check simulation output file existance
 
-        // 3.3. Make calls to the simulator
+    // 2.5 Initialize optimization logger
 
-        // 3.4. Wait for threads to join
+// 3. Run simulation
 
-    // 4. Read results
+    // 3.1. Create model input variations
 
-        // 4.1. Check existance for all reports
+    // 3.2. Split simulator calls in threads
 
-        // 4.2. Split parser calls in threads
+    // 3.3. Make calls to the simulator
 
-        // 4.3. Parse reports and fill response vectors
+    // 3.4. Wait for threads to join
 
-        // 4.4. Wait for threads to join
-    
-    // 5. Decide on optimization or end process (then goto 6 or 7)
+// 4. Read results
 
-        // 5.1. Check constraints of each OptimizationUnit
+    // 4.1. Check existance for all reports
 
-        // 5.2. Calculate fit for each OptimizationUnit
+    // 4.2. Split parser calls in threads
 
-        // 5.3. Compare fit with solutions vector
+    // 4.3. Parse reports and fill response vectors
 
-        // 5.4. Check for pause instruction - GOTO 7.1
+    // 4.4. Wait for threads to join
 
-        // 5.5. Check for stop conditions - GOTO 7.1
+// 5. Decide on optimization or end process (then goto 6 or 7)
 
-        // 5.6. Continue optimization if there's no stop reason - GOTO 6.1 
+    // 5.1. Check constraints of each OptimizationUnit
 
-    // 6. Optimize
+    // 5.2. Calculate fit for each OptimizationUnit
 
-        // 6.1. Get two best fit from generation
+    // 5.3. Compare fit with solutions vector
 
-        // 6.2. Mix control values
+    // 5.4. Check for pause instruction - GOTO 7.1
 
-        // 6.3. Mutate some values randomly
+    // 5.5. Check for stop conditions - GOTO 7.1
 
-        // 6.4. Run next generation simulations - GOTO 3.1
+    // 5.6. Continue optimization if there's no stop reason - GOTO 6.1 
 
-    // 7. Post optimization interations
+// 6. Optimize
 
-        // 7.1. Show stop reason and optimization results
+    // 6.1. Get two best fit from generation
 
-        // 7.2. Check for optimization resume - GOTO 6.1
+    // 6.2. Mix control values
 
-        // 7.3. Write results
+    // 6.3. Mutate some values randomly
 
-        // 7.4. Close application
+    // 6.4. Run next generation simulations - GOTO 3.1
 
+// 7. Post optimization interations
+
+    // 7.1. Show stop reason and optimization results
+
+    // 7.2. Check for optimization resume - GOTO 6.1
+
+    // 7.3. Write results
+
+    // 7.4. Close application
+
+    logger.info("Exiting optimization application", 2);
     return 0;
 }

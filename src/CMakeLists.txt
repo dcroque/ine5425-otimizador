@@ -8,5 +8,5 @@ target_sources(
     PRIVATE
         main.cpp
         structures.hpp
-        structures.cpp
+        binary_tree.hpp
 )
