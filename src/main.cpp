@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     // 1.2. Check input file existance
 
     if (!cli.loaded()) {
-        logger.error("Exiting application with an error");
+        logger.error("Configuration file not found. Exiting application with an error");
         return 1;
     } else {
         logger.info("Configuration file succesfully loaded", 2);
@@ -23,15 +23,15 @@ int main(int argc, char** argv) {
 
 // 2. Setup stuff
 
-    // 2.1. Parse input files
+    // 2.1. Initialize OptimizationCore
 
-    // 2.2. Initialize OptimizationCore
+    auto core = structures::OptimizationCore(cli.cfg_file(), cli.verbosity());
 
-    // 2.3. Run model simulation to check integrity
+    // 2.2. Run model simulation to check integrity
 
-    // 2.4. Check simulation output file existance
+    // 2.3. Check simulation output file existance
 
-    // 2.5 Initialize optimization logger
+    // 2.4 Initialize optimization logger
 
 // 3. Run simulation
 
