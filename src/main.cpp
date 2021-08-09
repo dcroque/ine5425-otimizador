@@ -2,7 +2,7 @@
 
 #include<iostream>
 
-#include "structures.hpp"
+#include "library.hpp"
 
 int main(int argc, char** argv) {
 // 1. Read command
@@ -27,11 +27,7 @@ int main(int argc, char** argv) {
 
     auto core = structures::OptimizationCore(cli.cfg_file(), cli.verbosity());
 
-    // 2.2. Run model simulation to check integrity
-
-    // 2.3. Check simulation output file existance
-
-    // 2.4 Initialize optimization logger
+    // 2.2. Check configurations integrity
 
 // 3. Run simulation
 

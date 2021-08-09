@@ -13,11 +13,8 @@ Essa aplicação pode ser utilizada para otimizar variáveis de controle de mode
     - [X] 1.2. Check input file existance
 
 - [ ] 2. Setup stuff
-    - [ ] 2.1. Parse input files
-    - [ ] 2.2. Initialize OptimizationCore
-    - [ ] 2.3. Run model simulation to check integrity
-    - [ ] 2.4. Check simulation output file existance
-    - [ ] 2.5 Initialize optimization logger
+    - [ ] 2.1. Initialize OptimizationCore
+    - [ ] 2.2. Check configurations integrity
 
 - [ ] 3. Run simulation
     - [ ] 3.1. Create model input variations
