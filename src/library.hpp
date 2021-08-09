@@ -51,7 +51,7 @@ namespace data {
             std::string get_name();
             double get_value();
 
-            void set_value(double& _value);
+            void set_value(double _value);
     };
 
     class VarVector {
@@ -118,37 +118,48 @@ namespace structures {
 
     class OptimizationUnit {
         private:
+            std::string ID; 
             logger::Logger logger = logger::Logger("OPT_UNIT", 2);
             data::VarVector controls;
             data::VarVector responses;
             double fit;
+
+            void set_fit(double _fit);
         public:
-            OptimizationUnit(OptimizationUnit& parent1, OptimizationUnit& parent2, std::string ID, int verb);
-            OptimizationUnit(data::VarVector _controls, std::string ID, int verb);
+            OptimizationUnit(OptimizationUnit const& parent1, OptimizationUnit const& parent2, std::string ID, int verb);
+            OptimizationUnit(data::VarVector const& _controls, std::string ID, int verb);
             OptimizationUnit();
             ~OptimizationUnit();
-
             void config_logger(std::string _entity, int _verb);
+
             data::VarVector get_controls();
             data::VarVector get_responses();
-
-            void set_fit(double& _fit);
-
             double get_fit();
+            std::string get_id();
+
+            bool set_var(std::string _name, double _value);
     };
 
     class OptimizationConfig {
         private:
+            logger::Logger logger = logger::Logger("OPT_CONFIG_CORE", 2);
+
+            bool check_integrity();
+        public:
+            OptimizationConfig(std::string config_filename, int _verb);
+            OptimizationConfig();
+            ~OptimizationConfig();
+
             std::vector<std::string> controls;
             std::vector<std::string> responses;
             std::vector<data::Constraint> constraints;
             std::vector<data::Objective> objectives;
+            OptimizationUnit initial_unit;
+
             std::string model_path;
             std::string project;
             std::string simulator_path;
             std::string config_filename;
-            logger::Logger logger = logger::Logger("OPT_CONFIG_CORE", 2);
-            OptimizationUnit initial_unit;
 
             int replication_amount = 30;
             int generation_size = 20;
@@ -158,12 +169,9 @@ namespace structures {
             int min_gen = 10;
             bool valid;
 
-            bool check_integrity();
-        public:
-            OptimizationConfig(std::string config_filename, int _verb);
-            OptimizationConfig();
-            ~OptimizationConfig();
             bool valid_configs();
+            std::string get_base_run_cmd();
+            std::string get_project_path();
     };
 
     class Solution {
@@ -180,13 +188,25 @@ namespace structures {
             logger::Logger logger = logger::Logger("OPT_CORE", 2);
             OptimizationConfig configs;
             std::vector<Solution> solutions;
+            std::string base_run_cmd;
+            std::vector<OptimizationUnit> generation;
 
             int persist = 0;
             int gen = 0;
+
+            std::string save_folder();
+            std::string model_name(std::string id);
+            std::string output_name(std::string id);
+            std::string model_save_path(std::string id);
+            std::string output_save_path(std::string id);
+
+            int run_test_unit();
+            void setup_unit(OptimizationUnit unit);
         public:
             OptimizationCore(std::string config_filename, int _verb);
             ~OptimizationCore();
             bool valid_configs();
+            int run_unit(OptimizationUnit& unit);
     };
 }
 

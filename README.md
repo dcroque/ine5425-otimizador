@@ -13,8 +13,8 @@ Essa aplicação pode ser utilizada para otimizar variáveis de controle de mode
     - [X] 1.2. Check input file existance
 
 - [ ] 2. Setup stuff
-    - [ ] 2.1. Initialize OptimizationCore
-    - [ ] 2.2. Check configurations integrity
+    - [X] 2.1. Initialize OptimizationCore
+    - [X] 2.2. Check configurations integrity
 
 - [ ] 3. Run simulation
     - [ ] 3.1. Create model input variations
@@ -32,18 +32,18 @@ Essa aplicação pode ser utilizada para otimizar variáveis de controle de mode
     - [ ] 5.1. Check constraints of each OptimizationUnit
     - [ ] 5.2. Calculate fit for each OptimizationUnit
     - [ ] 5.3. Compare fit with solutions vector
-    - [ ] 5.4. Check for pause instruction - [ ] GOTO 7.1
-    - [ ] 5.5. Check for stop conditions - [ ] GOTO 7.1
-    - [ ] 5.6. Continue optimization if there's no stop reason - [ ] GOTO 6.1 
+    - [ ] 5.4. Check for pause instruction - GOTO 7.1
+    - [ ] 5.5. Check for stop conditions - GOTO 7.1
+    - [ ] 5.6. Continue optimization if there's no stop reason - GOTO 6.1 
 
 - [ ] 6. Optimize
     - [ ] 6.1. Get two best fit from generation
     - [ ] 6.2. Mix control values
     - [ ] 6.3. Mutate some values randomly
-    - [ ] 6.4. Run next generation simulations - [ ] GOTO 3.1
+    - [ ] 6.4. Run next generation simulations - GOTO 3.1
 
 - [ ] 7. Post optimization interations
     - [ ] 7.1. Show stop reason and optimization results
-    - [ ] 7.2. Check for optimization resume - [ ] GOTO 6.1
+    - [ ] 7.2. Check for optimization resume - GOTO 6.1
     - [ ] 7.3. Write results
     - [ ] 7.4. Close application

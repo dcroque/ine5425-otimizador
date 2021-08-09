@@ -32,6 +32,17 @@ const char* cmd(std::string cmd) {
     return cmd.c_str();
 }
 
+int count_digit(int number) {
+   return int(std::log10(number) + 1);
+}
+
+std::string n_digit(std::string id, int n) {
+    while(id.length() < n) {
+        id = "0" + id;
+    }
+
+    return id;
+}
 
 // logger::Logger
 
@@ -120,7 +131,7 @@ double data::Variable::get_value() {
     return value;
 }
 
-void data::Variable::set_value(double& _value) {
+void data::Variable::set_value(double _value) {
     value = _value;
 }
 
@@ -434,15 +445,24 @@ bool structures::OptimizationConfig::valid_configs() {
     return valid;
 }
 
+std::string structures::OptimizationConfig::get_base_run_cmd() {
+    auto cmd = "./" + simulator_path + " ";
+    return cmd;
+}
+
+std::string structures::OptimizationConfig::get_project_path() {
+    return "projects/" + project;
+}
+
 // structures::OptimizationUnit
 
-structures::OptimizationUnit::OptimizationUnit(OptimizationUnit& parent1, OptimizationUnit& parent2, std::string ID, int verb) {
-    logger.set_entity(ID);
+structures::OptimizationUnit::OptimizationUnit(OptimizationUnit const& parent1, OptimizationUnit const& parent2, std::string ID, int verb) {
+    logger.set_entity("OPT_UNIT_" + ID);
     logger.set_verb(verb);
 }
 
-structures::OptimizationUnit::OptimizationUnit(data::VarVector _controls, std::string ID, int verb) {
-    logger.set_entity(ID);
+structures::OptimizationUnit::OptimizationUnit(data::VarVector const& _controls, std::string ID, int verb) {
+    logger.set_entity("OPT_UNIT_" + ID);
     logger.set_verb(verb);
     controls = _controls;
 }
@@ -455,17 +475,84 @@ data::VarVector structures::OptimizationUnit::get_controls() {
     return controls;
 }
 
+bool structures::OptimizationUnit::set_var(std::string _name, double _value) {
+    auto var_pos = controls.var_exist(_name); 
+    if (var_pos >= 0) {
+        controls.vector[var_pos].set_value(_value);
+        return true;
+    } else {
+        logger.warn("set_var method couldn't find " + _name + "variable", 4);
+        return false;
+    }
+}
+
+std::string structures::OptimizationUnit::get_id() {
+    return ID;
+}
+
 // structures::OptimizationCore
 
 structures::OptimizationCore::OptimizationCore(std::string config_filename, int _verb) {
     logger.set_verb(_verb);
     configs = OptimizationConfig(config_filename, _verb);
+
+    base_run_cmd = configs.get_base_run_cmd();
+    if (!run_test_unit()) {
+        logger.info("Test simulation: OK", 3);
+    } else {
+
+    }
 }
 
 structures::OptimizationCore::~OptimizationCore() {}
 
 bool structures::OptimizationCore::valid_configs() {
     return configs.valid_configs();
+}
+
+int structures::OptimizationCore::run_test_unit() {
+    logger.info("Running test simulation...", 4);
+    return run_unit(configs.initial_unit);
+}
+
+void structures::OptimizationCore::setup_unit(OptimizationUnit unit) {
+    std::system(cmd("mkdir -p "+ save_folder()));
+    std::system(cmd("cp " + configs.model_path + " " + model_save_path(unit.get_id())));
+}
+
+int structures::OptimizationCore::run_unit(OptimizationUnit& unit) {
+    setup_unit(unit);
+    logger.info("Running unit simulation", 4);
+    auto result = std::system(cmd(  base_run_cmd + model_save_path(unit.get_id()) + " > " + output_save_path(unit.get_id())));
+    
+    if (!result) {
+        logger.warn("Error runing simulation!", 3);
+        logger.warn("Genesys return code: " + result, 4);
+    } else {
+        logger.info("Simulation done!", 3);
+    }
+
+    return result;
+}
+
+std::string structures::OptimizationCore::save_folder() {
+    return configs.get_project_path() + "/" + "gen_" + n_digit(std::to_string(gen), 3);
+}
+
+std::string structures::OptimizationCore::model_name(std::string id) {
+    return n_digit(id, count_digit(configs.generation_size)) + "_model.txt";
+}
+
+std:: string structures::OptimizationCore::output_name(std::string id) {
+    return n_digit(id, count_digit(configs.generation_size)) + "_ouput.txt";
+}
+
+std::string structures::OptimizationCore::model_save_path(std::string id) {
+    return save_folder() + "/" + model_name(id);
+}
+
+std::string structures::OptimizationCore::output_save_path(std::string id) {
+    return save_folder() + "/" + output_name(id);
 }
 
 // structures::Solution
