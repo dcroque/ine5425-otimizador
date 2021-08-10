@@ -17,7 +17,7 @@ Essa aplicação pode ser utilizada para otimizar variáveis de controle de mode
     - [X] 2.2. Check configurations integrity
 
 - [ ] 3. Run simulation
-    - [ ] 3.1. Create model input variations
+    - [X] 3.1. Create model input variations
     - [ ] 3.2. Split simulator calls in threads
     - [ ] 3.3. Make calls to the simulator
     - [ ] 3.4. Wait for threads to join

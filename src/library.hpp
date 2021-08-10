@@ -14,8 +14,8 @@
 #include <random>
 #include <sstream>
 #include <iterator>
-
-#include "binary_tree.hpp"
+#include <pthread.h>
+#include <random>
 
 namespace logger {
     class Logger {
@@ -58,7 +58,7 @@ namespace data {
 
     class VarVector {
         public:
-            std::vector<Variable> vector;
+            std::vector<Variable> vector = {};
 
             VarVector();
             ~VarVector();
@@ -69,39 +69,47 @@ namespace data {
             bool set_var(std::string _name, double _value);
     };
 
-    class ExpressionTree {
+    class Expression {
         private:
             std::string expression;
-            int input_size;
-            structures::BinaryTree<std::string> calc_tree;
-
-            int first_operator(std::string expr);
-            std::vector<std::string> operators = {"+", "-", "*", "/", "^", "%", "l"};
+            std::vector<std::string> operators = {"+", "-", "*", "/", "^", "l"};
             std::vector<std::string> comparators = {"!=", ">=", "<=", ">", "<", "="};
-        public:
-            ExpressionTree(std::string _expression);
-            ExpressionTree();
-            ~ExpressionTree();
 
+            std::vector<Expression> split(std::string op);
+            std::vector<Expression> split(int pos);
+            std::string subst(VarVector& vars);
+        public:
+            Expression(std::string _expression);
+            Expression();
+            ~Expression();
+
+            double eval(VarVector& vars, int p);
+            bool good_depth();
+            std::string get_expr();
+            void set_expr(std::string expr);
     };
 
     class Constraint {
         private:
-            ExpressionTree expression;
+            Expression expression;
         public:
             Constraint(std::string _expression);
             Constraint();
             ~Constraint();
+
+            bool eval(VarVector& controls, int p);
     };
 
     class Objective {
         private:
             bool max;
-            ExpressionTree expression;
+            Expression expression;
         public:
             Objective(bool _max, std::string _expression);
             Objective();
             ~Objective();
+
+            double eval(VarVector& responses, int p);
     };
 }
 
@@ -126,8 +134,8 @@ namespace structures {
             data::VarVector responses;
             double fit;
 
-            void set_fit(double _fit);
             bool parse_responses(std::string report_filename, std::vector<std::string> response_labels);
+            std::string build_expr(std::string expr);
         public:
             OptimizationUnit(OptimizationUnit const& parent1, OptimizationUnit const& parent2, std::string ID, int verb);
             OptimizationUnit(data::VarVector const& _controls, std::string ID, int verb);
@@ -142,6 +150,8 @@ namespace structures {
 
             bool set_var(std::string _name, double _value);
             bool run(std::string base_cmd, std::string input, std::string output, std::vector<std::string> responses);
+            void set_fit(data::Objective objc);
+            void set_fit(std::vector<data::Objective> objc, double factor);
     };
 
     class OptimizationConfig {
@@ -212,6 +222,12 @@ namespace structures {
             ~OptimizationCore();
             bool valid_configs();
             bool run_unit(OptimizationUnit& unit);
+            int get_gen();
+            void new_gen();
+            bool run_gen();
+            void check_gen_results();
+            bool check_optimization_end();
+            void show_results();
     };
 }
 

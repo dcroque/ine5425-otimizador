@@ -196,34 +196,192 @@ bool data::VarVector::set_var(std::string _name, double _value) {
     }
 }
 
-// data::ExpressionTree
+// data::Expression
 
-data::ExpressionTree::ExpressionTree(std::string _expression) {}
+data::Expression::Expression(std::string _expression) {
+    expression = _expression;
+}
 
-data::ExpressionTree::ExpressionTree() {}
+data::Expression::Expression() {}
 
-data::ExpressionTree::~ExpressionTree() {}
+data::Expression::~Expression() {}
+
+std::string data::Expression::subst(VarVector& vars) {
+    auto temp = expression;
+
+    for(auto i = 0; i < vars.vector.size(); i++) {
+        auto name = vars.vector[i].get_name();
+        auto value = std::to_string(vars.vector[i].get_value());
+        auto pos = temp.find(name);
+        while (pos != std::string::npos) {
+            temp.replace(pos, name.size(), value);
+            pos = temp.find(name);
+        }
+    }
+}
+
+double data::Expression::eval(VarVector& vars, int p) {
+    auto precision = pow(10, -p);
+    while (expression[0] == '(') {
+        auto no_border = Expression(expression.substr(1, expression.size()-2));
+        if (no_border.good_depth()) {
+            expression = expression.substr(1, expression.size()-2);
+        } else {
+            break;
+        }
+    }
+
+    int op = -1;
+    for(auto i = 0; i < comparators.size(); i++) {
+        if (expression.find(comparators[i]) != std::string::npos) {
+            op = i;
+            break;
+        }
+    }
+    if (op >= 0) {
+        auto exprs = split(comparators[op]);
+        switch (op) {
+            case 0:
+                if (fabs(exprs[0].eval(vars, p) - exprs[1].eval(vars, p)) > precision) {return 1;} 
+                else {return 0;}
+            case 1:
+                if (exprs[0].eval(vars, p) - exprs[1].eval(vars, p) >= precision) {return 1;} 
+                else {return 0;}
+            case 2:
+                if (exprs[0].eval(vars, p) - exprs[1].eval(vars, p) <= precision) {return 1;} 
+                else {return 0;}
+            case 3:
+                if (exprs[0].eval(vars, p) - exprs[1].eval(vars, p) > precision) {return 1;} 
+                else {return 0;}
+            case 4:
+                if (exprs[0].eval(vars, p) - exprs[1].eval(vars, p) < precision) {return 1;} 
+                else {return 0;}
+            case 5:
+                if (fabs(exprs[0].eval(vars, p) - exprs[1].eval(vars, p)) < precision) {return 1;} 
+                else {return 0;}
+        }
+    } else {
+        for(auto i = 0; i < operators.size(); i++) {
+            int ini = 0;
+            while (expression.find(operators[i]) != std::string::npos) {
+                ini = expression.find(operators[i], ini);
+                if (ini == std::string::npos) {
+                    break;
+                }
+                auto exprs = split(ini);
+                ini += 1;
+                if (exprs[0].good_depth() && exprs[1].good_depth()) {
+                    switch (i)
+                    {
+                    case 0:
+                        return exprs[0].eval(vars, p) + exprs[1].eval(vars, p);
+                    case 1:
+                        return exprs[0].eval(vars, p) - exprs[1].eval(vars, p);
+                    case 2:
+                        return exprs[0].eval(vars, p) * exprs[1].eval(vars, p);
+                    case 3:
+                        return exprs[0].eval(vars, p) / exprs[1].eval(vars, p);
+                    case 4:
+                        return pow(exprs[0].eval(vars, p), exprs[1].eval(vars, p));
+                    case 5:
+                        return log(exprs[1].eval(vars, p)) /  log(exprs[0].eval(vars, p));
+                    }
+                }
+            }
+        }
+
+        if (expression == "PI") {
+            return M_PI;
+        } else if (expression == "E") {
+            return M_E;
+        } else if (vars.var_value(expression) != HUGE_VAL) {
+            return vars.var_value(expression);
+        } else {
+            try {
+                auto temp = std::stod(expression);
+                return temp;
+            } catch (...) {
+                std::cout << "ERROR IN EXPRESSION: " << expression << std::endl;
+                return 0;
+            }
+        }
+    }
+    std::cout << "EXPRESSION NOT PARSED: " << expression << std::endl;
+    return 0;
+}
+
+std::vector<data::Expression> data::Expression::split(std::string op) {
+    auto pos = expression.find(op);
+    auto expr1 = expression.substr(0, pos);
+    auto expr2 = expression.substr(pos+op.size());
+
+    return std::vector<data::Expression>{data::Expression(expr1), data::Expression(expr2)};
+}
+
+std::vector<data::Expression> data::Expression::split(int pos) {
+    auto expr1 = expression.substr(0, pos);
+    auto expr2 = expression.substr(pos+1);
+
+    return std::vector<data::Expression>{data::Expression(expr1), data::Expression(expr2)};
+}
+
+bool data::Expression::good_depth() {
+    auto counter = 0;
+    for(auto i = 0; i < expression.size(); i++) {
+        if (expression[i] == '(') {
+            counter += 1;
+        } else if (expression[i] == ')') {
+            counter -= 1;
+        }
+
+        if (counter < 0) {
+            return false;
+        }
+    }
+
+    if (counter > 0 ) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+std::string data::Expression::get_expr() {
+    return expression;
+}
+
+void data::Expression::set_expr(std::string expr) {
+    expression = expr;
+}
 
 // data::Constraint
 
 data::Constraint::Constraint(std::string _expression) {
-    expression = ExpressionTree(_expression);
+    expression = Expression(_expression);
 }
 
 data::Constraint::Constraint() {}
 
 data::Constraint::~Constraint() {}
 
+bool data::Constraint::eval(VarVector& controls, int p) {
+    return expression.eval(controls, p);
+}
+
 // data::Objective
 
 data::Objective::Objective(bool _max, std::string _expression) {
     max = _max;
-    expression = ExpressionTree(_expression);
+    expression = Expression(_expression);
 }
 
 data::Objective::Objective() {}
 
 data::Objective::~Objective() {}
+
+double data::Objective::eval(VarVector& responses, int p) {
+    return expression.eval(responses, p);
+}
 
 // structures::CLI
 
@@ -604,10 +762,11 @@ structures::OptimizationCore::OptimizationCore(std::string config_filename, int 
     configs = OptimizationConfig(config_filename, _verb);
 
     base_run_cmd = configs.get_base_run_cmd();
-    if (!run_test_unit()) {
+    if (run_test_unit()) {
         logger.info("Test simulation: OK", 3);
     } else {
-        // TODO
+        logger.error("Error trying to run test model");
+        configs.valid = false;
     }
 }
 
@@ -620,7 +779,6 @@ bool structures::OptimizationCore::valid_configs() {
 bool structures::OptimizationCore::run_test_unit() {
     logger.info("Running test simulation...", 4);
     return run_unit(configs.initial_unit);
-    // TODO
 }
 
 void structures::OptimizationCore::setup_unit(OptimizationUnit unit) {
@@ -673,13 +831,7 @@ bool structures::OptimizationCore::run_unit(OptimizationUnit& unit) {
     std::system(cmd(base_run_cmd + model_save_path(unit.get_id()) + " > " + output_save_path(unit.get_id())));
 
     auto result = unit.run(base_run_cmd, model_save_path(unit.get_id()), output_save_path(unit.get_id()), configs.responses);
-    
-    if (result) {
-        return true;
-    } else {
-        return false;
-    }
-    // TODO
+
     return result;
 }
 
@@ -702,6 +854,18 @@ std::string structures::OptimizationCore::model_save_path(std::string id) {
 std::string structures::OptimizationCore::output_save_path(std::string id) {
     return save_folder() + "/" + output_name(id);
 }
+
+int structures::OptimizationCore::get_gen() {return 0;}
+
+void structures::OptimizationCore::new_gen() {}
+
+bool structures::OptimizationCore::run_gen() {return false;}
+
+void structures::OptimizationCore::check_gen_results() {}
+
+bool structures::OptimizationCore::check_optimization_end() {return false;}
+
+void structures::OptimizationCore::show_results() {}
 
 // structures::Solution
 

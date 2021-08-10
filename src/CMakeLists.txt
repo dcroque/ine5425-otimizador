@@ -9,5 +9,4 @@ target_sources(
         main.cpp
         library.hpp
         library.cpp
-        binary_tree.hpp
 )

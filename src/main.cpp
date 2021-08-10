@@ -1,18 +1,10 @@
 // Copyright [2021] <Matheus Dhanyel Cândido Roque>
 
-#include<iostream>
-
 #include "library.hpp"
 
 int main(int argc, char** argv) {
-// 1. Read command
-
-    // 1.1. Parse command line
-
     auto cli = structures::CLI(argc, argv);
     auto logger = logger::Logger("MAIN", cli.verbosity());
-
-    // 1.2. Check input file existance
 
     if (!cli.loaded()) {
         logger.error("Configuration file not found. Exiting application with an error");
@@ -21,13 +13,10 @@ int main(int argc, char** argv) {
         logger.info("Configuration file succesfully loaded", 2);
     }
 
-// 2. Setup stuff
-
-    // 2.1. Initialize OptimizationCore
-
     auto core = structures::OptimizationCore(cli.cfg_file(), cli.verbosity());
-
-    // 2.2. Check configurations integrity
+    auto keep_optimization_running = false;
+    auto pause = false;
+    auto keep_dont_ask = 0;
 
 // 3. Run simulation
 
@@ -39,6 +28,35 @@ int main(int argc, char** argv) {
 
     // 3.4. Wait for threads to join
 
+    while(keep_optimization_running) {
+        core.new_gen();
+
+        auto run_status = core.run_gen();
+
+        if (run_status) {
+            logger.info("Generation "+ std::to_string(core.get_gen()) + " succesful", 3);
+        } else {
+            logger.error("Couldn't run this generation " + std::to_string(core.get_gen()) +". Aborting");
+            return 1;
+        }
+
+        keep_optimization_running = core.check_optimization_end();
+
+        if (keep_dont_ask == 0 && cli.verbosity() > 1 && keep_optimization_running) {
+            logger.info("Keep running for how much more generations? Enter 0 to pause and -1 to end optimization", 2);
+            int n = 0;
+            try {
+                std::cin >> n;
+            } catch (...) {
+                logger.warn("Couldn't understand your input. Pausing optimization", 2);
+                pause = true;
+            }
+        }
+
+        while((pause || !keep_optimization_running) && cli.verbosity() > 0) {
+            core.show_results();
+        }
+    }
 // 4. Read results
 
     // 4.1. Check existance for all reports
