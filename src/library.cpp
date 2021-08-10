@@ -13,10 +13,33 @@ std::vector<std::string> split(std::string text, std::string delimiter) {
         temp = text.substr(ini, substr_pos);
         ini += temp.length()+delimiter.length();
         result.push_back(temp);
+        if (ini >= text.length()) {
+            return result;
+        }
     }
 
     result.push_back(text.substr(ini));
     return result;
+}
+
+std::vector<std::string> split_string(std::string text, char delimiter){
+	
+    std::vector<std::string> v;
+	std::string temp = "";
+	for(auto i = 0; i < text.length(); i++){
+		
+		if(text[i]==delimiter){
+			v.push_back(temp);
+			temp = "";
+		}
+		else{
+			temp.push_back(text[i]);
+		}
+		
+	}
+	v.push_back(temp);
+	
+    return v;
 }
 
 bool check_file_existance(std::string filename) {
@@ -279,7 +302,7 @@ structures::OptimizationConfig::OptimizationConfig(std::string _config_filename,
         std::string line;
         while(getline(config_file, line)){
             if (line.substr(0, 1) == "#") {
-                logger.warn("Ignoring comment line in config file", 4);
+                logger.warn("Ignoring comment line in config file", 5);
             } else if (line.substr(0, 1) == "*"){
                 if (line.find("*Controls") == 0) {
                     logger.info("Found control variables section", 4);
@@ -307,11 +330,12 @@ structures::OptimizationConfig::OptimizationConfig(std::string _config_filename,
                     section_in[5] = true;
                 }
             } else if (line.length() == 0){
-                logger.warn("Ignoring empty line in config file", 4);
+                logger.warn("Ignoring empty line in config file", 5);
             } else {
                 if (section_in[0]) {
-                    controls.push_back(line);
-                    logger.info("Control variable added: "+line, 3);
+                    controls.push_back(line.substr(4));
+                    controls_types.push_back(line.substr(0,4));
+                    logger.info("Control variable of type " + line.substr(0,3) + " added: "+ line.substr(4), 3);
                 } else if (section_in[1]) {
                     constraints.push_back(data::Constraint(line));
                     logger.info("Added new constraint: "+line, 3);
@@ -397,6 +421,7 @@ structures::OptimizationConfig::OptimizationConfig(std::string _config_filename,
         config_file.close();
     }
 
+    initial_unit = OptimizationUnit(initial_data, "TEST", logger.get_verb());
     config_filename = _config_filename;
     logger.info(config_filename + " fully parsed", 3);
     valid = check_integrity();
@@ -431,9 +456,11 @@ bool structures::OptimizationConfig::check_integrity() {
         logger.info("Copying configurations file", 4);
         std::system(cmd("cp " + config_filename + " projects/" + project + "/config.txt"));
 
+        data::VarVector init_controls;
         for(auto i = 0; i < controls.size(); i++) {
             if (initial_unit.get_controls().var_value(controls[i]) == HUGE_VAL) {
-                
+                logger.warn("No initial value set to " + controls[i] + " control variable: set to 0", 3);
+                init_controls.add_var(data::Variable(controls[i], 0));
             }
         }
 
@@ -486,8 +513,88 @@ bool structures::OptimizationUnit::set_var(std::string _name, double _value) {
     }
 }
 
+bool structures::OptimizationUnit::run(std::string base_cmd, std::string input, std::string output, std::vector<std::string> responses) {
+    logger.info("Running unit simulation", 4);
+    std::system(cmd(base_cmd + input + " > " + output));
+
+    auto result = check_file_existance(output);
+    
+    if (result) {
+        logger.info("Simulation done!", 3);
+        parse_responses(output, responses);
+        // TODO
+        return true;
+    } else {
+        logger.warn("Error runing simulation!", 3);
+        return false;
+    }
+}
+
 std::string structures::OptimizationUnit::get_id() {
     return ID;
+}
+
+bool structures::OptimizationUnit::parse_responses(std::string report_filename, std::vector<std::string> response_labels) {
+    if (!check_file_existance(report_filename)) {
+        logger.error("Output file not found!");
+        return false;
+    }
+
+    std::fstream report;
+    report.open(report_filename,std::ios::in);
+    bool conclusion_section = false;
+    bool all_responses = false;
+
+    logger.info("Parsing report...", 4);
+    if (report.is_open()){
+        std::string line;
+        while(getline(report, line)){
+            if (line.find("Begin of Report for Simulation") != std::string::npos) {
+                logger.info("Found report conclusion section", 4);
+                conclusion_section = true;
+            } else if (conclusion_section) {
+                auto response_line = false;
+                std::string response_label = "None";
+
+                for(auto i = 0; i < response_labels.size(); i++) {
+                    if (line.find(response_labels[i]) != std::string::npos) {
+                        response_line = true;
+                        response_label = response_labels[i];
+                        break;
+                    }
+                }
+                
+                if (response_line) {
+                    auto spl_line = split_string(line, ' ');
+                    // spl_line[28] = average
+                    try {
+                        auto var = data::Variable(response_label, std::stod(spl_line[28]));
+                        responses.add_var(var);
+                        logger.info("Saving response for " + response_label + ": " + spl_line[28], 4);
+                        if (responses.vector.size() == response_labels.size()) {
+                            all_responses = true;
+                        }
+                    } catch (...) {
+                        logger.error("Couldn't parse " + response_label + " value: " + spl_line[28]);
+                        return false;
+                    }
+                }
+            }
+        }
+        report.close();
+    }
+
+    if (!all_responses) {
+        logger.error("Missing some responses in the reports");
+        for (auto i = 0; i < response_labels.size(); i++) {
+            if (!responses.var_exist(response_labels[i])) {
+                logger.error("Missing: " + response_labels[i]);
+            }
+        }
+        return false;
+    }
+
+    return true;
 }
 
 // structures::OptimizationCore
@@ -500,7 +607,7 @@ structures::OptimizationCore::OptimizationCore(std::string config_filename, int 
     if (!run_test_unit()) {
         logger.info("Test simulation: OK", 3);
     } else {
-
+        // TODO
     }
 }
 
@@ -510,28 +617,69 @@ bool structures::OptimizationCore::valid_configs() {
     return configs.valid_configs();
 }
 
-int structures::OptimizationCore::run_test_unit() {
+bool structures::OptimizationCore::run_test_unit() {
     logger.info("Running test simulation...", 4);
     return run_unit(configs.initial_unit);
+    // TODO
 }
 
 void structures::OptimizationCore::setup_unit(OptimizationUnit unit) {
+    logger.info("Setuping unit "+ unit.get_id() + "...", 4);
     std::system(cmd("mkdir -p "+ save_folder()));
-    std::system(cmd("cp " + configs.model_path + " " + model_save_path(unit.get_id())));
+    //std::system(cmd("cp " + configs.model_path + " " + model_save_path(unit.get_id())));
+
+    std::ofstream file_model;
+    file_model.open((model_save_path(unit.get_id()))); 
+    std::fstream file_temp;
+    file_temp.open(configs.model_path,std::ios::in);
+    
+    if (file_temp.is_open()) {
+        std::string line;
+        while(getline(file_temp, line)) {
+            logger.info("Cheking line: " + line, 4);
+            if(line.find("Resource") != std::string::npos){
+                for(auto i = 0; i < configs.controls.size(); i++) {
+                    auto ctrl_name = configs.controls[i];
+                    auto pos = line.find(ctrl_name);
+                    if (pos != std::string::npos) {
+                        pos += ctrl_name.size() + 1;
+                        auto prev_line = line.substr(0, pos);
+
+                        std::string value;
+                        if (configs.controls_types[i].find("INT") != std::string::npos) {
+                            int temp = ceil(unit.get_controls().var_value(ctrl_name));
+                            value = std::to_string(temp);
+                        } else {
+                            value = std::to_string(unit.get_controls().var_value(ctrl_name));
+                        }
+
+                        auto new_line = prev_line + " capacity=" + value;
+                        logger.info("Model new line: " + new_line, 4);
+                        file_model << new_line << std::endl;
+                    }
+                }
+            } else {
+                file_model << line << std::endl;
+            }
+        }
+    }
+    file_temp.close();
+    file_model.close();
 }
 
-int structures::OptimizationCore::run_unit(OptimizationUnit& unit) {
+bool structures::OptimizationCore::run_unit(OptimizationUnit& unit) {
     setup_unit(unit);
-    logger.info("Running unit simulation", 4);
-    auto result = std::system(cmd(  base_run_cmd + model_save_path(unit.get_id()) + " > " + output_save_path(unit.get_id())));
-    
-    if (!result) {
-        logger.warn("Error runing simulation!", 3);
-        logger.warn("Genesys return code: " + result, 4);
-    } else {
-        logger.info("Simulation done!", 3);
-    }
 
+    std::system(cmd(base_run_cmd + model_save_path(unit.get_id()) + " > " + output_save_path(unit.get_id())));
+
+    auto result = unit.run(base_run_cmd, model_save_path(unit.get_id()), output_save_path(unit.get_id()), configs.responses);
+    
+    if (result) {
+        return true;
+    } else {
+        return false;
+    }
+    // TODO
     return result;
 }
 

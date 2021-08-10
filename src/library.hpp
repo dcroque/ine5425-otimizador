@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <filesystem>
 #include <random>
+#include <sstream>
+#include <iterator>
 
 #include "binary_tree.hpp"
 
@@ -125,6 +127,7 @@ namespace structures {
             double fit;
 
             void set_fit(double _fit);
+            bool parse_responses(std::string report_filename, std::vector<std::string> response_labels);
         public:
             OptimizationUnit(OptimizationUnit const& parent1, OptimizationUnit const& parent2, std::string ID, int verb);
             OptimizationUnit(data::VarVector const& _controls, std::string ID, int verb);
@@ -138,6 +141,7 @@ namespace structures {
             std::string get_id();
 
             bool set_var(std::string _name, double _value);
+            bool run(std::string base_cmd, std::string input, std::string output, std::vector<std::string> responses);
     };
 
     class OptimizationConfig {
@@ -151,6 +155,7 @@ namespace structures {
             ~OptimizationConfig();
 
             std::vector<std::string> controls;
+            std::vector<std::string> controls_types;
             std::vector<std::string> responses;
             std::vector<data::Constraint> constraints;
             std::vector<data::Objective> objectives;
@@ -200,13 +205,13 @@ namespace structures {
             std::string model_save_path(std::string id);
             std::string output_save_path(std::string id);
 
-            int run_test_unit();
+            bool run_test_unit();
             void setup_unit(OptimizationUnit unit);
         public:
             OptimizationCore(std::string config_filename, int _verb);
             ~OptimizationCore();
             bool valid_configs();
-            int run_unit(OptimizationUnit& unit);
+            bool run_unit(OptimizationUnit& unit);
     };
 }
 
