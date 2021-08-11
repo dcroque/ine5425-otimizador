@@ -3,6 +3,9 @@ project(otimizador CXX)
 
 add_executable(otimizador)
 
+find_package(Threads REQUIRED)
+target_link_libraries(otimizador PRIVATE Threads::Threads)
+
 target_sources(
     otimizador
     PRIVATE

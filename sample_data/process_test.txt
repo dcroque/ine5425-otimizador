@@ -1,0 +1,79 @@
+# Blank lines and lines beginning with "# " will be ignored.
+# Lines beginning with * will set a new section of inputs.
+# Will need at least one section for Controls, Constraints, Responses, Objectives.
+# Initial_conditions and Configurations are optional sections
+# 
+# Execution flags:
+# -c, --config: 
+#       set file to parse configuration info
+# -v, --verbose: (default: 2)
+#       0 - shows nothing, 
+#       1 - show only post optimization menu, 
+#       2 - shows some optimization logs, 
+#       3 - show full log
+#       4 - show debug logs 
+
+# Set variables of the simulation that can be changed through the optimization process
+*Controls
+INT CPU_NUM
+FLT MEMORY_SIZE
+
+*Constraints
+
+# Memory between 0 and 64 GB
+MEMORY_SIZE>0
+MEMORY_SIZE<=65536
+
+# Number of CPUs between 1 and 32
+CPU_NUM>1
+CPU_NUM<=32
+
+# Memory costs around R$ 80/GB and processing cores costs roughly R$ (100*CPU_NUM)^(1.1+CPU_NUM/100)
+# The budget for memory and CPU is R$ 5000
+MEMORY_SIZE*80/1024+(100*CPU_NUM)^(1.1+CPU_NUM/100)<=5000
+
+# It must be possible to process 2GB per CPU at any configuration
+MEMORY_SIZE/2048>=CPU_NUM
+
+*Responses
+Queue1.WaitTime
+Queue2.WaitTime
+process.TotalTime
+
+*Objectives
+
+# Minimize processing time and wait times, giving higher value to decreasing wait times
+# Memory allocation wait time has weight 4 and CPU allocation weight 2.
+MIN (2*Queue1.WaitTime+4*Queue2.WaitTime)+process.TotalTime
+
+*Initial_conditions
+# 4 cores and 8GB memory with R$ 1125 total cost
+CPU_NUM=4
+MEMORY_SIZE=8192
+
+*Configurations
+
+PROJECT_NAME=SistemaOperacional
+
+MODEL_PATH=/TODO-insert-path/ine5425-otimizador/sample_data/SistemaOperacional02.txt
+
+SIMULATOR_PATH=/TODO-insert-path/2019_2022_GenESyS/dist/Debug/GNU-Linux/2019_2022_GenESyS
+
+# How many replications every simulation will make
+REPLICATIONS=30
+
+# How many decimal cases to determine equality.
+# i.e.: =5 means 10e-5 or lower is equal to 0
+PRECISION=5
+
+# How many variations each generation will have
+POPULATION=50
+
+# How many solutions must be saved
+SOLUTIONS=10
+
+# Minimum number of generations before checking for persistence
+MIN_GEN=10
+
+# How many generations can run without any improvement
+PERSISTENCE=5

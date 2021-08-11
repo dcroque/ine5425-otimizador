@@ -4,46 +4,58 @@
 
 Este projeto foi desenvolvido como parte da disciplina de Modelagem e Simulação do Curso de Ciências da Computação na Universidade Federal de Santa Catarina do semestre 2021/1.
 
-Essa aplicação pode ser utilizada para otimizar variáveis de controle de modelos de simulação, sendo aplicadas restrições e tentando máximizar/minimizar uma função objetivo. Ele é construído para funcionar com o simulador [GenESys](https://github.com/rlcancian/2019_2022_GenESyS) mas com alguns ajustes pode ser utilizado com outros simuladores.
+Essa aplicação pode ser utilizada para otimizar variáveis de controle de modelos de simulação, sendo aplicadas restrições e tentando máximizar/minimizar uma função objetivo. Ele é construído para funcionar com o simulador [GenESys](https://github.com/rlcancian/2019_2022_GenESyS) mas com alguns ajustes, em especial nos parsers de modelos e relatórios, pode ser utilizado com outros simuladores.
 
-## TODO
+# Como utilizar
 
-- [X] 1. Read command
-    - [X] 1.1. Parse command line
-    - [X] 1.2. Check input file existance
+Após clonar o repositório e o repositório do [GenESys](https://github.com/rlcancian/2019_2022_GenESyS), você antes de tudo precisará compilar o simulador. Para isso vá ao diretório do GenESys e execute:
 
-- [ ] 2. Setup stuff
-    - [X] 2.1. Initialize OptimizationCore
-    - [X] 2.2. Check configurations integrity
+> make QMAKE=qmake build
 
-- [ ] 3. Run simulation
-    - [X] 3.1. Create model input variations
-    - [ ] 3.2. Split simulator calls in threads
-    - [ ] 3.3. Make calls to the simulator
-    - [ ] 3.4. Wait for threads to join
+Em seguida você vai precisar ir para o diretório do otimizador e compilá-lo. Execute os seguintes comandos:
 
-- [ ] 4. Read results
-    - [ ] 4.1. Check existance for all reports
-    - [ ] 4.2. Split parser calls in threads
-    - [ ] 4.3. Parse reports and fill response vectors
-    - [ ] 4.4. Wait for threads to join
+> cmake -S src -B build
+> cmake --build build
 
-- [ ] 5. Decide on optimization or end process (then goto 6 or 7)
-    - [ ] 5.1. Check constraints of each OptimizationUnit
-    - [ ] 5.2. Calculate fit for each OptimizationUnit
-    - [ ] 5.3. Compare fit with solutions vector
-    - [ ] 5.4. Check for pause instruction - GOTO 7.1
-    - [ ] 5.5. Check for stop conditions - GOTO 7.1
-    - [ ] 5.6. Continue optimization if there's no stop reason - GOTO 6.1 
+Por fim, você pode executar o projeto de teste e analisá-lo pra entender melhor como montar seu arquivo de configuração. Lembre de configurar o caminho completo para o otimizador e para o modelo a ser otimizado antes de executar o seguinte comando:
 
-- [ ] 6. Optimize
-    - [ ] 6.1. Get two best fit from generation
-    - [ ] 6.2. Mix control values
-    - [ ] 6.3. Mutate some values randomly
-    - [ ] 6.4. Run next generation simulations - GOTO 3.1
+> ./build/otimizador -c sample_data/process_test.txt -v 2
 
-- [ ] 7. Post optimization interations
-    - [ ] 7.1. Show stop reason and optimization results
-    - [ ] 7.2. Check for optimization resume - GOTO 6.1
-    - [ ] 7.3. Write results
-    - [ ] 7.4. Close application
+Fique atento que você sempre precisará inserir a flag `-c` seguida do caminho relativo para o arquivo de configuração da otimização, a verbosidade pode ser alterada com `-v` mas é colocado por padrão como 2. Ao final da execução você poderá conferir na pasta `build/projects` os resultados das suas simulações, incluindo modelos de entrada e resultados do GenESys. Caso você queira salvar os resultados finais do seu projeto sem todos os logs execute:
+
+> ./build/otimizador -c sample_data/process_test.txt -v 0 > results.txt
+
+# Modelo genérico para GenESys
+
+Para utilizar o otimizador é necessário que você crie um modelo genérico que aceita especificações de modelo em linguagem de simulação, com entrada via linha de comando. Para isso você pode copiar o seguinte trecho de código e trocar pela função main de uma aplicação do GenESys:
+
+``` cpp
+if (argc != 2) {
+		std::cout << "\033[31mInclude only one input file, with full path\033[37m\n";
+		return 0;
+	} else {
+		if (FILE *file = fopen(argv[1], "r")) {
+			fclose(file);
+		} else {
+			std::cout << "\033[31mCouldn't find input file\033[37m\n";
+			return 0;
+		}
+	}
+
+	Simulator* genesys = new Simulator();
+	genesys->getTracer()->setTraceLevel(Util::TraceLevel::L5_event);
+	this->setDefaultTraceHandlers(genesys->getTracer());
+	this->insertFakePluginsByHand(genesys);
+	Model* model = genesys->getModels()->newModel();
+	model->load(argv[1]);
+	ModelSimulation* sim = model->getSimulation();
+	sim->start();
+
+	return 0;
+```
+
+Lembre de configurar o arquivo `Traits.h` também para executar essa implementação.
+
+# Aviso
+
+Antes de você usar o otimizador é recomendável testar se seu modelo está sendo aceito pelo GenESys, para isso compile o modelo generico e execute ele com o modelo em linguagem de simulação como entrada.

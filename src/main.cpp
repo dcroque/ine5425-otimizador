@@ -14,93 +14,117 @@ int main(int argc, char** argv) {
     }
 
     auto core = structures::OptimizationCore(cli.cfg_file(), cli.verbosity());
-    auto keep_optimization_running = false;
+    auto keep_optimization_running = true;
     auto pause = false;
-    auto keep_dont_ask = 0;
-
-// 3. Run simulation
-
-    // 3.1. Create model input variations
-
-    // 3.2. Split simulator calls in threads
-
-    // 3.3. Make calls to the simulator
-
-    // 3.4. Wait for threads to join
+    auto keep_dont_ask = 2;
+    auto force_stop = false;
+    auto reset_timer = true;
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::duration::zero();
 
     while(keep_optimization_running) {
+        keep_dont_ask -= 1;
+
+        if (reset_timer) {
+            elapsed = std::chrono::steady_clock::duration::zero();
+            reset_timer = false;
+        }
+
+        auto start_gen = std::chrono::high_resolution_clock::now();
         core.new_gen();
 
         auto run_status = core.run_gen();
 
         if (run_status) {
-            logger.info("Generation "+ std::to_string(core.get_gen()) + " succesful", 3);
+            logger.info("Generation "+ std::to_string(core.get_gen()) + " succesful", 2);
+            core.check_gen_results();
         } else {
-            logger.error("Couldn't run this generation " + std::to_string(core.get_gen()) +". Aborting");
+            logger.error("Couldn't run generation " + std::to_string(core.get_gen()) +". Aborting");
             return 1;
         }
 
         keep_optimization_running = core.check_optimization_end();
+
+        auto finish_gen = std::chrono::high_resolution_clock::now();
+        elapsed += finish_gen - start_gen;
 
         if (keep_dont_ask == 0 && cli.verbosity() > 1 && keep_optimization_running) {
             logger.info("Keep running for how much more generations? Enter 0 to pause and -1 to end optimization", 2);
             int n = 0;
             try {
                 std::cin >> n;
+
+                if (n == 0) {
+                    pause = true;
+                } else if (n == -1) {
+                    force_stop = true;
+                } else {
+                    keep_dont_ask += n;
+                }
             } catch (...) {
                 logger.warn("Couldn't understand your input. Pausing optimization", 2);
                 pause = true;
             }
         }
 
-        while((pause || !keep_optimization_running) && cli.verbosity() > 0) {
+        while(((pause && !force_stop) || !keep_optimization_running) && cli.verbosity() > 0) {
+            if (!keep_optimization_running) {
+                logger.info("Optimization core flagged an stop", 1);
+            } else if (pause) {
+                logger.info("Pause called by user", 1);
+            }
+
+            std::cout << "Elapsed optimization time: " << elapsed.count() << "s" << std::endl;
+            core.pause_menu();
+            int n = 0;
+            std::cin >> n;
+            pause = true;
+
+            while(pause) {
+                try {
+                    switch (n) {
+                        case 0:
+                            force_stop = true;
+                            pause = false;
+                            keep_optimization_running = true;
+                            break;
+                        case 1:
+                            core.show_results();
+                            break;
+                        case 2:
+                            pause = false;
+                            keep_optimization_running = true;
+                            break;
+                        case 3:
+                            reset_timer = true;
+                            break;
+                        default:
+                            break;
+                    }
+                } catch (...) {
+                    logger.warn("Please choose an valid option", 1);
+                    n = 9;
+                }
+
+                if (pause) {
+                    std::cout << "Elapsed optimization time: " << elapsed.count() << "s" << std::endl;
+                    core.pause_menu();
+                    std::cin >> n;
+                }
+            }
+        }
+
+        if (force_stop) {
+            logger.info("Termination selected by user", 1);
             core.show_results();
+            keep_optimization_running = false;
         }
     }
-// 4. Read results
-
-    // 4.1. Check existance for all reports
-
-    // 4.2. Split parser calls in threads
-
-    // 4.3. Parse reports and fill response vectors
-
-    // 4.4. Wait for threads to join
-
-// 5. Decide on optimization or end process (then goto 6 or 7)
-
-    // 5.1. Check constraints of each OptimizationUnit
-
-    // 5.2. Calculate fit for each OptimizationUnit
-
-    // 5.3. Compare fit with solutions vector
-
-    // 5.4. Check for pause instruction - GOTO 7.1
-
-    // 5.5. Check for stop conditions - GOTO 7.1
-
-    // 5.6. Continue optimization if there's no stop reason - GOTO 6.1 
-
-// 6. Optimize
-
-    // 6.1. Get two best fit from generation
-
-    // 6.2. Mix control values
-
-    // 6.3. Mutate some values randomly
-
-    // 6.4. Run next generation simulations - GOTO 3.1
-
-// 7. Post optimization interations
-
-    // 7.1. Show stop reason and optimization results
-
-    // 7.2. Check for optimization resume - GOTO 6.1
-
-    // 7.3. Write results
-
-    // 7.4. Close application
 
     logger.info("Exiting optimization application", 2);
+
+    if (cli.verbosity() == 0) {
+        core.show_results();
+    }
+
     return 0;
 }

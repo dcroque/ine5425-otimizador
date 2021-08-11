@@ -15,7 +15,9 @@
 #include <sstream>
 #include <iterator>
 #include <pthread.h>
+#include <future>
 #include <random>
+#include <chrono>
 
 namespace logger {
     class Logger {
@@ -72,12 +74,11 @@ namespace data {
     class Expression {
         private:
             std::string expression;
-            std::vector<std::string> operators = {"+", "-", "*", "/", "^", "l"};
+            std::vector<std::string> operators = {"+", "-", "*", "/", "^"};
             std::vector<std::string> comparators = {"!=", ">=", "<=", ">", "<", "="};
 
             std::vector<Expression> split(std::string op);
             std::vector<Expression> split(int pos);
-            std::string subst(VarVector& vars);
         public:
             Expression(std::string _expression);
             Expression();
@@ -98,6 +99,7 @@ namespace data {
             ~Constraint();
 
             bool eval(VarVector& controls, int p);
+            std::string get_expr();
     };
 
     class Objective {
@@ -110,6 +112,7 @@ namespace data {
             ~Objective();
 
             double eval(VarVector& responses, int p);
+            std::string get_expr();
     };
 }
 
@@ -133,12 +136,13 @@ namespace structures {
             data::VarVector controls;
             data::VarVector responses;
             double fit;
+            bool pass_constraints = false;
 
             bool parse_responses(std::string report_filename, std::vector<std::string> response_labels);
             std::string build_expr(std::string expr);
         public:
-            OptimizationUnit(OptimizationUnit const& parent1, OptimizationUnit const& parent2, std::string ID, int verb);
-            OptimizationUnit(data::VarVector const& _controls, std::string ID, int verb);
+            OptimizationUnit(OptimizationUnit& parent1, OptimizationUnit& parent2, std::string _ID, int verb);
+            OptimizationUnit(data::VarVector const& _controls, std::string _ID, int verb);
             OptimizationUnit();
             ~OptimizationUnit();
             void config_logger(std::string _entity, int _verb);
@@ -149,9 +153,11 @@ namespace structures {
             std::string get_id();
 
             bool set_var(std::string _name, double _value);
-            bool run(std::string base_cmd, std::string input, std::string output, std::vector<std::string> responses);
-            void set_fit(data::Objective objc);
-            void set_fit(std::vector<data::Objective> objc, double factor);
+            bool run(std::string base_cmd, std::string input, std::string output, std::vector<std::string> _responses);
+            void set_fit(data::Objective objc, int p);
+            void set_fit(std::vector<data::Objective> objc, int p, double factor);
+            void set_constraint_pass(std::vector<data::Constraint> constraints, int p);
+            bool valid_solution();
     };
 
     class OptimizationConfig {
@@ -192,10 +198,16 @@ namespace structures {
     class Solution {
         private:
             OptimizationUnit unit;
+            int gen;
+            int pop;
         public:
-            Solution(OptimizationUnit _unit);
+            Solution(OptimizationUnit _unit, int _gen, int _pop);
             Solution();
             ~Solution();
+
+            double get_fit();
+            OptimizationUnit get_unit();
+            void show_info();
     };
 
     class OptimizationCore {
@@ -216,18 +228,19 @@ namespace structures {
             std::string output_save_path(std::string id);
 
             bool run_test_unit();
-            void setup_unit(OptimizationUnit unit);
+            void setup_unit(OptimizationUnit* unit);
         public:
             OptimizationCore(std::string config_filename, int _verb);
             ~OptimizationCore();
             bool valid_configs();
-            bool run_unit(OptimizationUnit& unit);
+            bool run_unit(OptimizationUnit* unit);
             int get_gen();
             void new_gen();
             bool run_gen();
             void check_gen_results();
             bool check_optimization_end();
             void show_results();
+            void pause_menu();
     };
 }
 

@@ -206,20 +206,6 @@ data::Expression::Expression() {}
 
 data::Expression::~Expression() {}
 
-std::string data::Expression::subst(VarVector& vars) {
-    auto temp = expression;
-
-    for(auto i = 0; i < vars.vector.size(); i++) {
-        auto name = vars.vector[i].get_name();
-        auto value = std::to_string(vars.vector[i].get_value());
-        auto pos = temp.find(name);
-        while (pos != std::string::npos) {
-            temp.replace(pos, name.size(), value);
-            pos = temp.find(name);
-        }
-    }
-}
-
 double data::Expression::eval(VarVector& vars, int p) {
     auto precision = pow(10, -p);
     while (expression[0] == '(') {
@@ -283,8 +269,6 @@ double data::Expression::eval(VarVector& vars, int p) {
                         return exprs[0].eval(vars, p) / exprs[1].eval(vars, p);
                     case 4:
                         return pow(exprs[0].eval(vars, p), exprs[1].eval(vars, p));
-                    case 5:
-                        return log(exprs[1].eval(vars, p)) /  log(exprs[0].eval(vars, p));
                     }
                 }
             }
@@ -301,13 +285,11 @@ double data::Expression::eval(VarVector& vars, int p) {
                 auto temp = std::stod(expression);
                 return temp;
             } catch (...) {
-                std::cout << "ERROR IN EXPRESSION: " << expression << std::endl;
-                return 0;
+                return HUGE_VAL;
             }
         }
     }
-    std::cout << "EXPRESSION NOT PARSED: " << expression << std::endl;
-    return 0;
+    return HUGE_VAL;
 }
 
 std::vector<data::Expression> data::Expression::split(std::string op) {
@@ -368,6 +350,10 @@ bool data::Constraint::eval(VarVector& controls, int p) {
     return expression.eval(controls, p);
 }
 
+std::string data::Constraint::get_expr() {
+    return expression.get_expr();
+}
+
 // data::Objective
 
 data::Objective::Objective(bool _max, std::string _expression) {
@@ -379,8 +365,12 @@ data::Objective::Objective() {}
 
 data::Objective::~Objective() {}
 
+std::string data::Objective::get_expr() {
+    return expression.get_expr();
+}
+
 double data::Objective::eval(VarVector& responses, int p) {
-    return expression.eval(responses, p);
+    return expression.eval(responses, p)*(2*max-1);
 }
 
 // structures::CLI
@@ -641,13 +631,41 @@ std::string structures::OptimizationConfig::get_project_path() {
 
 // structures::OptimizationUnit
 
-structures::OptimizationUnit::OptimizationUnit(OptimizationUnit const& parent1, OptimizationUnit const& parent2, std::string ID, int verb) {
-    logger.set_entity("OPT_UNIT_" + ID);
+structures::OptimizationUnit::OptimizationUnit(OptimizationUnit& parent1, OptimizationUnit& parent2, std::string _ID, int verb) {
+    logger.set_entity("OPT_UNIT_" + _ID);
     logger.set_verb(verb);
+    ID = _ID;
+
+
+    auto c1 = parent1.get_controls();
+    auto c2 = parent2.get_controls();
+
+    data::VarVector vars;
+
+    for(auto i = 0; i < c1.vector.size(); i++) {
+        int choice = rand() % 2;
+        double mutation = ((rand() % 10000) / 10000.0);
+        if (choice) {
+            auto name = c1.vector[i].get_name();
+            auto value = c1.var_value(name)*(1+mutation);
+
+            auto var = data::Variable(name, value);
+            vars.vector.push_back(var);
+        } else {
+            auto name = c2.vector[i].get_name();
+            auto value = c2.var_value(name)*(1-mutation);
+
+            auto var = data::Variable(name, value);
+            vars.vector.push_back(var);
+        }
+    }
+
+    controls = vars;
 }
 
-structures::OptimizationUnit::OptimizationUnit(data::VarVector const& _controls, std::string ID, int verb) {
-    logger.set_entity("OPT_UNIT_" + ID);
+structures::OptimizationUnit::OptimizationUnit(data::VarVector const& _controls, std::string _ID, int verb) {
+    logger.set_entity("OPT_UNIT_" + _ID);
+    ID = _ID;
     logger.set_verb(verb);
     controls = _controls;
 }
@@ -671,20 +689,46 @@ bool structures::OptimizationUnit::set_var(std::string _name, double _value) {
     }
 }
 
-bool structures::OptimizationUnit::run(std::string base_cmd, std::string input, std::string output, std::vector<std::string> responses) {
+bool structures::OptimizationUnit::run(std::string base_cmd, std::string input, std::string output, std::vector<std::string> _responses) {
     logger.info("Running unit simulation", 4);
     std::system(cmd(base_cmd + input + " > " + output));
 
     auto result = check_file_existance(output);
     
     if (result) {
-        logger.info("Simulation done!", 3);
-        parse_responses(output, responses);
-        // TODO
-        return true;
+        auto parse_result = parse_responses(output, _responses);
+        if (parse_result) {
+            logger.info("Simulation done!", 3);
+            return true;
+        } else {
+            logger.error("Error parsing responses");
+            return false;
+        }
     } else {
         logger.warn("Error runing simulation!", 3);
         return false;
+    }
+}
+
+double structures::OptimizationUnit::get_fit() {
+    return fit;
+}
+
+void structures::OptimizationUnit::set_fit(data::Objective objc, int p) {
+    fit = objc.eval(responses, p);
+}
+
+void structures::OptimizationUnit::set_fit(std::vector<data::Objective> objc, int p, double factor) {
+    fit = objc[0].eval(responses, p);
+}
+
+void structures::OptimizationUnit::set_constraint_pass(std::vector<data::Constraint> constraints, int p) {
+    pass_constraints = true;
+    for(auto i = 0; i < constraints.size(); i++) {
+        if (!constraints[i].eval(controls, p)) {
+            logger.info("Unit don't fulfill a constraint: " + constraints[i].get_expr(), 3);
+            pass_constraints = false;
+        }
     }
 }
 
@@ -693,6 +737,8 @@ std::string structures::OptimizationUnit::get_id() {
 }
 
 bool structures::OptimizationUnit::parse_responses(std::string report_filename, std::vector<std::string> response_labels) {
+    responses = {};
+    
     if (!check_file_existance(report_filename)) {
         logger.error("Output file not found!");
         return false;
@@ -755,6 +801,10 @@ bool structures::OptimizationUnit::parse_responses(std::string report_filename, 
     return true;
 }
 
+bool structures::OptimizationUnit::valid_solution() {
+    return pass_constraints;
+}
+
 // structures::OptimizationCore
 
 structures::OptimizationCore::OptimizationCore(std::string config_filename, int _verb) {
@@ -778,16 +828,15 @@ bool structures::OptimizationCore::valid_configs() {
 
 bool structures::OptimizationCore::run_test_unit() {
     logger.info("Running test simulation...", 4);
-    return run_unit(configs.initial_unit);
+    std::system(cmd("mkdir -p "+ save_folder()));
+    return run_unit(&configs.initial_unit);
 }
 
-void structures::OptimizationCore::setup_unit(OptimizationUnit unit) {
-    logger.info("Setuping unit "+ unit.get_id() + "...", 4);
-    std::system(cmd("mkdir -p "+ save_folder()));
-    //std::system(cmd("cp " + configs.model_path + " " + model_save_path(unit.get_id())));
+void structures::OptimizationCore::setup_unit(OptimizationUnit* unit) {
+    logger.info("Setuping unit "+ unit->get_id() + "...", 4);
 
     std::ofstream file_model;
-    file_model.open((model_save_path(unit.get_id()))); 
+    file_model.open((model_save_path(unit->get_id()))); 
     std::fstream file_temp;
     file_temp.open(configs.model_path,std::ios::in);
     
@@ -805,10 +854,11 @@ void structures::OptimizationCore::setup_unit(OptimizationUnit unit) {
 
                         std::string value;
                         if (configs.controls_types[i].find("INT") != std::string::npos) {
-                            int temp = ceil(unit.get_controls().var_value(ctrl_name));
+                            unit->set_var(ctrl_name, ceil(unit->get_controls().var_value(ctrl_name)));
+                            int temp = unit->get_controls().var_value(ctrl_name);
                             value = std::to_string(temp);
                         } else {
-                            value = std::to_string(unit.get_controls().var_value(ctrl_name));
+                            value = std::to_string(unit->get_controls().var_value(ctrl_name));
                         }
 
                         auto new_line = prev_line + " capacity=" + value;
@@ -825,12 +875,12 @@ void structures::OptimizationCore::setup_unit(OptimizationUnit unit) {
     file_model.close();
 }
 
-bool structures::OptimizationCore::run_unit(OptimizationUnit& unit) {
+bool structures::OptimizationCore::run_unit(OptimizationUnit* unit) {
     setup_unit(unit);
 
-    std::system(cmd(base_run_cmd + model_save_path(unit.get_id()) + " > " + output_save_path(unit.get_id())));
+    std::system(cmd(base_run_cmd + model_save_path(unit->get_id()) + " > " + output_save_path(unit->get_id())));
 
-    auto result = unit.run(base_run_cmd, model_save_path(unit.get_id()), output_save_path(unit.get_id()), configs.responses);
+    auto result = unit->run(base_run_cmd, model_save_path(unit->get_id()), output_save_path(unit->get_id()), configs.responses);
 
     return result;
 }
@@ -855,24 +905,167 @@ std::string structures::OptimizationCore::output_save_path(std::string id) {
     return save_folder() + "/" + output_name(id);
 }
 
-int structures::OptimizationCore::get_gen() {return 0;}
+int structures::OptimizationCore::get_gen() {return gen;}
 
-void structures::OptimizationCore::new_gen() {}
+void structures::OptimizationCore::new_gen() {
+    gen += 1;
+    std::system(cmd("mkdir -p "+ save_folder()));
+    logger.info("Setting up generation " + std::to_string(gen), 2);
 
-bool structures::OptimizationCore::run_gen() {return false;}
+    if (solutions.empty()) {
+        while(generation.size() < configs.generation_size) {
+            generation.push_back(OptimizationUnit(
+                configs.initial_unit, 
+                configs.initial_unit, 
+                std::to_string(generation.size()+1), 
+                logger.get_verb()
+            ));
+        }
+    } else {
+        while(generation.size() < configs.generation_size) {
+            int id1 = rand() % solutions.size();
+            int id2 = rand() % solutions.size();
+            while (id1 == id2 && solutions.size() > 1) {
+                id2 = (id2 + rand()) % solutions.size();
+            }
 
-void structures::OptimizationCore::check_gen_results() {}
+            auto parent1 = solutions[id1].get_unit();
+            auto parent2 = solutions[id2].get_unit();
 
-bool structures::OptimizationCore::check_optimization_end() {return false;}
+            generation.push_back(OptimizationUnit(
+                parent1, 
+                parent2, 
+                std::to_string(generation.size()+1), 
+                logger.get_verb()
+            ));
+        }
+    }
+}
 
-void structures::OptimizationCore::show_results() {}
+bool structures::OptimizationCore::run_gen() {
+    std::vector<std::future<bool>> futures;
+    //std::vector<bool> futures;
+
+    for (auto i = 0; i < generation.size(); i++) {
+        auto load = &generation[i];
+        auto f = [&](auto load) {return this->run_unit(load);};
+        futures.push_back(std::async(f, load));
+        //futures.push_back(run_unit(load));
+    }
+
+    auto final_result = true;
+    for (auto i = 0; i < futures.size(); i++) {
+        auto run_res = futures[i].get();
+        //auto run_res = futures[i];
+        if (!run_res) {
+            final_result = false;
+        }
+    }
+
+    return final_result;
+}
+
+void structures::OptimizationCore::check_gen_results() {
+    auto has_new = false;
+    for(auto i = 0; i < generation.size(); i++) {
+        generation[i].set_fit(configs.objectives[0], configs.precision);
+        generation[i].set_constraint_pass(configs.constraints, configs.precision);
+
+        if (solutions.size() < configs.solutions) {
+            if (generation[i].valid_solution()) {
+                logger.info("Adding unit " + generation[i].get_id() + " from gen " + std::to_string(gen) + " to solutions. FIT: " + std::to_string(generation[i].get_fit()), 2);
+                solutions.push_back(Solution(generation[i], gen, configs.generation_size));
+                has_new = true;
+            }
+        } else {
+            if (generation[i].valid_solution()) {
+                    auto checking = Solution(generation[i], gen, configs.generation_size);
+                auto inserted = false;
+                for(auto j = 0; j < solutions.size(); j++) {
+                    if (checking.get_fit() > solutions[j].get_fit()) {
+                        auto temp = solutions[j];
+                        solutions[j] = checking;
+                        checking = temp;
+                        if (!inserted) {
+                            logger.info("Adding unit " + generation[i].get_id() + " from gen " + std::to_string(gen) + " to solutions. FIT: " + std::to_string(generation[i].get_fit()), 2);
+                            inserted = true;
+                            has_new = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (has_new) {
+        persist = 0;
+    } else {
+        persist += 1;
+    }
+}
+
+bool structures::OptimizationCore::check_optimization_end() {
+    if (gen > configs.min_gen) {
+        persist = 0;
+        return true;
+    } 
+    
+    if (persist > configs.max_persist) {
+        logger.warn("Too many generations without progress", 2);    
+        return false;
+    }
+
+    return true;
+}
+
+void structures::OptimizationCore::show_results() {
+    logger.info("Showing best solutions",1);
+    for(auto i = 0; i < solutions.size(); i++) {
+        solutions[i].show_info();
+    }
+    std::cout << std::endl;
+}
+
+void structures::OptimizationCore::pause_menu() {
+    std::cout << "Select an option by number:" << std::endl 
+    << std::endl
+    << "[1] Show results so far" << std::endl
+    << "[2] Unpause" << std::endl
+    << "[3] Reset timer" << std::endl
+    << std::endl
+    << "[0] Terminate optimization" << std::endl 
+    << std::endl
+    << "Choose option: ";
+}
 
 // structures::Solution
 
-structures::Solution::Solution(OptimizationUnit _unit) {
+structures::Solution::Solution(OptimizationUnit _unit, int _gen, int _pop) {
     unit = _unit;
+    gen = _gen;
+    pop = _pop;
 }
 
 structures::Solution::Solution() {}
 
 structures::Solution::~Solution() {}
+
+double structures::Solution::get_fit() {
+    return unit.get_fit();
+}
+
+structures::OptimizationUnit structures::Solution::get_unit() {
+    return unit;
+}
+
+void structures::Solution::show_info() {
+    std::cout << std::endl
+    << "==== SOLUTION GEN " << n_digit(std::to_string(gen), 3) << " / ID " << n_digit(unit.get_id(), count_digit(pop)) << std::endl 
+    << "  FIT: " << unit.get_fit() << std::endl
+    << "  CONTROLS" << std::endl;
+
+    for(auto i = 0; i < unit.get_controls().vector.size(); i++) {
+        std::cout << "    " << unit.get_controls().vector[i].get_name() << " = " << unit.get_controls().vector[i].get_value() << std::endl;
+    }
+
+}
